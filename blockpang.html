@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="블록팡! 같은 색 블록을 터뜨리는 심심풀이 퍼즐 게임. 한 판 1~3분!">
+<title>블록팡! - 심심풀이 퍼즐</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; touch-action:manipulation; }
+  html, body { height:100%; }
+  body {
+    background:#12182b;
+    color:#e8ecf7;
+    font-family:-apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
+    user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+    overflow:hidden;
+  }
+  #wrap {
+    height:100vh; height:100dvh;
+    max-width:520px; margin:0 auto;
+    display:flex; flex-direction:column;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    gap:8px;
+  }
+  /* 구형 iOS 등 dvh 미지원 브라우저: 주소창에 하단이 가려지지 않도록 */
+  @supports not (height: 100dvh) {
+    #wrap { height:100%; }
+  }
+
+  /* ============================================================
+     ▼▼ 광고 영역 ▼▼
+     .ad-slot 안의 안내 문구를 지우고 광고 코드(애드센스/애드핏 등)를
+     붙여넣으면 됩니다. 광고를 안 쓸 슬롯은 div째로 지워도 게임에
+     아무 영향이 없습니다.
+     ============================================================ */
+  .ad-slot {
+    flex:none;
+    display:flex; align-items:center; justify-content:center;
+    min-height:52px;
+    border:1.5px dashed #3a4569; border-radius:10px;
+    color:#5a6690; font-size:12px; letter-spacing:1px;
+  }
+  .ad-slot.square { width:300px; max-width:100%; min-height:250px; margin:10px auto; }
+
+  header { flex:none; display:flex; align-items:center; gap:10px; }
+  h1 { font-size:20px; font-weight:800; letter-spacing:-0.5px; }
+  h1 .bang { color:#ffc145; }
+  .stats { display:flex; gap:12px; margin-left:auto; text-align:center; }
+  .stats .stat { font-size:10px; color:#8a94b8; line-height:1.3; }
+  .stats b { display:block; font-size:16px; color:#fff; font-variant-numeric:tabular-nums; }
+  .btns { display:flex; gap:6px; }
+  button {
+    font-family:inherit; border:none; border-radius:10px; cursor:pointer;
+    background:#2a3352; color:#dfe6ff; font-size:13px; font-weight:700;
+    padding:8px 10px; touch-action:manipulation;
+  }
+  button:active { transform:scale(0.96); }
+
+  #boardWrap { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  canvas { display:block; border-radius:14px; touch-action:manipulation; }
+
+  #help { flex:none; font-size:11.5px; color:#7d88ad; text-align:center; line-height:1.45; }
+
+  /* 낮은 화면(가로 모드 폰 등): 보드 공간 확보 */
+  @media (max-height:520px) {
+    #help { display:none; }
+    .ad-slot { min-height:36px; }
+  }
+
+  /* 게임 종료 오버레이 */
+  #overlay {
+    position:fixed; inset:0; z-index:10;
+    background:rgba(9,12,24,0.78); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+    display:flex; padding:16px;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+    opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  #overlay.show { opacity:1; pointer-events:auto; }
+  .panel {
+    background:#1c2440; border:1px solid #333e68; border-radius:18px;
+    padding:22px 20px; width:100%; max-width:340px; text-align:center;
+    box-shadow:0 18px 60px rgba(0,0,0,.5);
+    margin:auto; /* 공간이 모자라면 스크롤, 남으면 중앙 정렬 */
+  }
+  .panel h2 { font-size:22px; margin-bottom:12px; }
+  .panel .row { display:flex; justify-content:space-between; font-size:14px; color:#aab4d8; padding:5px 6px; }
+  .panel .row b { color:#fff; font-variant-numeric:tabular-nums; }
+  .panel .record { color:#ffc145; font-weight:800; font-size:13px; margin-top:4px; }
+  #retryBtn {
+    width:100%; margin-top:12px; padding:14px;
+    background:linear-gradient(135deg,#ff5d73,#ff8f5d); color:#fff;
+    font-size:17px; font-weight:800; border-radius:12px;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+
+  <!-- ▼▼ 광고 영역 1 : 상단 배너 (권장: 반응형 배너 or 320×50) ▼▼
+       사용 예) 카카오 애드핏:
+       <ins class="kakao_ad_area" style="display:none" data-ad-unit="DAN-XXXXXXXX"
+            data-ad-width="320" data-ad-height="50"></ins>
+       <script async src="https://t1.daumcdn.net/kas/static/ba.min.js"></script>
+       사용 예) 구글 애드센스: 애드센스에서 발급받은 <ins class="adsbygoogle"> 코드 붙여넣기 -->
+  <div class="ad-slot" id="adTop">광 고 영 역 (상단 배너)</div>
+  <!-- ▲▲ 광고 영역 1 끝 ▲▲ -->
+
+  <header>
+    <h1>블록팡<span class="bang">!</span></h1>
+    <div class="stats">
+      <div class="stat">점수<b id="score">0</b></div>
+      <div class="stat">최고<b id="best">0</b></div>
+      <div class="stat">남은 그룹<b id="groups">0</b></div>
+    </div>
+    <div class="btns">
+      <button id="soundBtn" aria-label="소리 켜기/끄기">🔊</button>
+      <button id="newBtn">새 판</button>
+    </div>
+  </header>
+
+  <div id="boardWrap"><canvas id="game"></canvas></div>
+
+  <p id="help">같은 색 블록이 <b>2개 이상 붙어 있으면</b> 눌러서 터뜨리세요.<br>한 번에 많이 터뜨릴수록 점수가 확 커집니다! (n×(n−1)점)</p>
+
+</div>
+
+<!-- 판 종료 오버레이 -->
+<div id="overlay">
+  <div class="panel">
+    <h2 id="overTitle">판 종료!</h2>
+    <div class="row"><span>이번 판 점수</span><b id="overScore">0</b></div>
+    <div class="row"><span>최고 기록</span><b id="overBest">0</b></div>
+    <div class="row"><span>남은 블록</span><b id="overLeft">0</b></div>
+    <div class="record" id="overRecord" hidden>🎉 신기록 달성!</div>
+
+    <!-- ▼▼ 광고 영역 2 : 판 종료 화면 (권장: 300×250 사각형) ▼▼ -->
+    <div class="ad-slot square" id="adOver">광 고 영 역 (300×250)</div>
+    <!-- ▲▲ 광고 영역 2 끝 ▲▲ -->
+
+    <button id="retryBtn">다시 하기 ↻</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+(function(){
+
+/* ---------- 상수 ---------- */
+var COLS = 9, ROWS = 12, NCOLORS = 4;
+var ALL_CLEAR_BONUS = 500;
+var COLORS = [
+  {main:'#ff5d73', dark:'#b8374f', light:'#ffb3c0'},
+  {main:'#ffc145', dark:'#c78f1e', light:'#ffe09a'},
+  {main:'#3ddc84', dark:'#1f9e58', light:'#a2f0c6'},
+  {main:'#4cc3ff', dark:'#2384bd', light:'#aae2ff'}
+];
+
+/* ---------- 상태 ---------- */
+var canvas = document.getElementById('game');
+var ctx = canvas.getContext('2d');
+var grid = [];            // grid[col][row] = 블록 or null (row 0 = 맨 위)
+var cell = 32;            // 셀 한 칸의 픽셀 크기
+var score = 0, best = 0, bestAtStart = 0;
+var gameOver = false;
+var particles = [], floats = [];
+var hoverSet = null;
+var overlayTimer = null;
+
+var $ = function(id){ return document.getElementById(id); };
+
+/* ---------- 저장 ---------- */
+function loadNum(key){ try { return +localStorage.getItem(key) || 0; } catch(e){ return 0; } }
+function save(key, v){ try { localStorage.setItem(key, v); } catch(e){} }
+
+/* ---------- 사운드 (외부 파일 없이 WebAudio 합성) ---------- */
+var audioCtx = null;
+var muted = loadNum('blockpang_muted') === 1;
+function ensureAudio(){
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+  }
+  // iOS는 통화/잠금 후 'interrupted' 상태가 되므로 running이 아니면 항상 resume 시도
+  if (audioCtx && audioCtx.state !== 'running' && audioCtx.resume) {
+    try { audioCtx.resume(); } catch(e){}
+  }
+}
+function beep(freq, dur, type, vol, delay){
+  if (muted || !audioCtx) return;
+  try {
+    var t = audioCtx.currentTime + (delay || 0);
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type || 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t + dur);
+  } catch(e){}
+}
+function soundPop(n){ beep(240 + Math.min(n,12) * 45, 0.09, 'square', 0.05); if (n >= 6) beep(480 + n*40, 0.12, 'triangle', 0.05, 0.05); }
+function soundDud(){ beep(110, 0.08, 'sawtooth', 0.03); }
+function soundOver(){ beep(330, 0.15, 'triangle', 0.06); beep(220, 0.25, 'triangle', 0.06, 0.15); }
+function soundClear(){ [523, 659, 784, 1047].forEach(function(f, i){ beep(f, 0.18, 'triangle', 0.07, i * 0.12); }); }
+
+/* ---------- 보드 생성 ---------- */
+function makeBlock(color, c, r){
+  return { color: color, col: c, row: r,
+           fx: c, fy: r - ROWS - Math.random() * 4, vy: 0, shake: 0 };
+}
+function newGame(){
+  score = 0; gameOver = false; particles = []; floats = []; hoverSet = null;
+  bestAtStart = best;
+  if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+  do {
+    grid = [];
+    for (var c = 0; c < COLS; c++) {
+      grid[c] = [];
+      for (var r = 0; r < ROWS; r++)
+        grid[c][r] = makeBlock((Math.random() * NCOLORS) | 0, c, r);
+    }
+  } while (countGroups() === 0);
+  $('overlay').classList.remove('show');
+  updateHud();
+}
+
+/* ---------- 그룹 탐색 ---------- */
+function findGroup(c0, r0){
+  var start = grid[c0] && grid[c0][r0];
+  if (!start) return [];
+  var color = start.color, seen = {}, stack = [[c0, r0]], out = [];
+  seen[c0 * ROWS + r0] = true;
+  while (stack.length) {
+    var p = stack.pop(), c = p[0], r = p[1];
+    out.push(grid[c][r]);
+    var nb = [[c+1,r],[c-1,r],[c,r+1],[c,r-1]];
+    for (var i = 0; i < 4; i++) {
+      var nc = nb[i][0], nr = nb[i][1];
+      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+      var k = nc * ROWS + nr;
+      if (seen[k]) continue;
+      var b = grid[nc][nr];
+      if (b && b.color === color) { seen[k] = true; stack.push([nc, nr]); }
+    }
+  }
+  return out;
+}
+function countGroups(){
+  var seen = {}, n = 0;
+  for (var c = 0; c < COLS; c++) for (var r = 0; r < ROWS; r++) {
+    if (!grid[c][r] || seen[c * ROWS + r]) continue;
+    var g = findGroup(c, r);
+    for (var i = 0; i < g.length; i++) seen[g[i].col * ROWS + g[i].row] = true;
+    if (g.length >= 2) n++;
+  }
+  return n;
+}
+function countBlocks(){
+  var n = 0;
+  for (var c = 0; c < COLS; c++) for (var r = 0; r < ROWS; r++) if (grid[c][r]) n++;
+  return n;
+}
+
+/* ---------- 터뜨리기 ---------- */
+function tapCell(c, r){
+  if (gameOver) return;
+  var b = grid[c] && grid[c][r];
+  if (!b) return;
+  var group = findGroup(c, r);
+  if (group.length < 2) { b.shake = 1; soundDud(); return; }
+
+  var pts = group.length * (group.length - 1);
+  score += pts;
+  var cx = 0, cy = 0;
+  for (var i = 0; i < group.length; i++) {
+    var g = group[i];
+    cx += g.fx; cy += g.fy;
+    spawnParticles(g);
+    grid[g.col][g.row] = null;
+  }
+  floats.push({ x: cx / group.length + 0.5, y: cy / group.length, text: '+' + pts, life: 1 });
+  soundPop(group.length);
+  hoverSet = null;
+
+  applyGravity();
+  compactColumns();
+  afterMove();
+}
+function applyGravity(){
+  for (var c = 0; c < COLS; c++) {
+    var col = [];
+    for (var r = 0; r < ROWS; r++) if (grid[c][r]) col.push(grid[c][r]);
+    grid[c] = [];
+    for (r = 0; r < ROWS; r++) grid[c][r] = null;
+    var rr = ROWS - 1;
+    for (var i = col.length - 1; i >= 0; i--) { col[i].row = rr; grid[c][rr] = col[i]; rr--; }
+  }
+}
+function compactColumns(){
+  var cols = [];
+  for (var c = 0; c < COLS; c++) {
+    var hasAny = false;
+    for (var r = 0; r < ROWS; r++) if (grid[c][r]) { hasAny = true; break; }
+    if (hasAny) cols.push(grid[c]);
+  }
+  while (cols.length < COLS) {
+    var empty = [];
+    for (r = 0; r < ROWS; r++) empty.push(null);
+    cols.push(empty);
+  }
+  grid = cols;
+  for (c = 0; c < COLS; c++) for (r = 0; r < ROWS; r++) if (grid[c][r]) grid[c][r].col = c;
+}
+function afterMove(){
+  var groups = countGroups();
+  var left = countBlocks();
+  if (groups === 0) {
+    gameOver = true;
+    var allClear = left === 0;
+    if (allClear) {
+      score += ALL_CLEAR_BONUS;
+      floats.push({ x: COLS / 2, y: ROWS / 2, text: '올클리어 +' + ALL_CLEAR_BONUS, life: 1.6 });
+    }
+    if (score > best) { best = score; save('blockpang_best', best); }
+    updateHud();
+    if (allClear) soundClear(); else soundOver();
+    overlayTimer = setTimeout(function(){ showOverlay(allClear, left); }, 750);
+  } else {
+    if (score > best) { best = score; save('blockpang_best', best); }
+    updateHud();
+  }
+}
+function showOverlay(allClear, left){
+  $('overTitle').textContent = allClear ? '완벽 클리어! 🏆' : '판 종료!';
+  $('overScore').textContent = score;
+  $('overBest').textContent = best;
+  $('overLeft').textContent = left + '개';
+  $('overRecord').hidden = !(score > bestAtStart);
+  $('overlay').classList.add('show');
+}
+function updateHud(){
+  $('score').textContent = score;
+  $('best').textContent = best;
+  $('groups').textContent = gameOver ? 0 : countGroups();
+}
+
+/* ---------- 파티클 / 점수 텍스트 ---------- */
+function spawnParticles(b){
+  for (var i = 0; i < 6; i++) {
+    particles.push({
+      x: b.fx + 0.5, y: b.fy + 0.5,
+      vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.9) * 9,
+      color: b.color, size: 0.13 + Math.random() * 0.12, life: 0.55
+    });
+  }
+}
+
+/* ---------- 렌더링 ---------- */
+function roundRect(x, y, w, h, rad){
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+}
+var lastT = 0, resizePollT = 0, dirty = true;
+function anyMotion(){
+  if (particles.length || floats.length) return true;
+  for (var c = 0; c < COLS; c++) for (var r = 0; r < ROWS; r++) {
+    var b = grid[c][r];
+    if (b && (b.fy !== b.row || b.fx !== b.col || b.shake > 0)) return true;
+  }
+  return false;
+}
+function frame(t){
+  var dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
+  lastT = t;
+  resizePollT += dt;
+  if (resizePollT > 0.5) { resizePollT = 0; checkResize(); }
+  var moving = anyMotion();
+
+  // 물리 업데이트
+  for (var c = 0; c < COLS; c++) for (var r = 0; r < ROWS; r++) {
+    var b = grid[c][r];
+    if (!b) continue;
+    if (b.fy < b.row) {                       // 아래로 낙하
+      b.vy += 55 * dt;
+      b.fy = Math.min(b.row, b.fy + b.vy * dt);
+      if (b.fy === b.row) b.vy = 0;
+    }
+    if (b.fx !== b.col) {                     // 좌측으로 스르륵
+      b.fx += (b.col - b.fx) * Math.min(1, dt * 12);
+      if (Math.abs(b.col - b.fx) < 0.01) b.fx = b.col;
+    }
+    if (b.shake > 0) b.shake = Math.max(0, b.shake - dt * 4);
+  }
+  for (var i = particles.length - 1; i >= 0; i--) {
+    var p = particles[i];
+    p.life -= dt; if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.vy += 26 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (i = floats.length - 1; i >= 0; i--) {
+    var f = floats[i];
+    f.life -= dt; if (f.life <= 0) { floats.splice(i, 1); continue; }
+    f.y -= dt * 1.1;
+  }
+
+  // 그리기 (움직임도 변경도 없으면 다시 그리지 않음 — 배터리 절약)
+  if (!moving && !dirty) { requestAnimationFrame(frame); return; }
+  dirty = false;
+  var W = cell * COLS, H = cell * ROWS;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#1a2138';
+  roundRect(0, 0, W, H, 14); ctx.fill();
+  ctx.save();
+  roundRect(0, 0, W, H, 14); ctx.clip();
+
+  var gap = Math.max(1.5, cell * 0.07), rad = cell * 0.22;
+  for (c = 0; c < COLS; c++) for (r = 0; r < ROWS; r++) {
+    b = grid[c][r];
+    if (!b) continue;
+    var col = COLORS[b.color];
+    var sx = b.shake > 0 ? Math.sin(b.shake * 40) * b.shake * cell * 0.08 : 0;
+    var x = b.fx * cell + gap / 2 + sx, y = b.fy * cell + gap / 2;
+    var s = cell - gap;
+    var hovered = hoverSet && hoverSet[b.col * ROWS + b.row];
+    ctx.fillStyle = col.dark;
+    roundRect(x, y + s * 0.06, s, s * 0.94, rad); ctx.fill();
+    ctx.fillStyle = hovered ? col.light : col.main;
+    roundRect(x, y, s, s * 0.88, rad); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    roundRect(x + s * 0.14, y + s * 0.1, s * 0.34, s * 0.16, s * 0.08); ctx.fill();
+  }
+
+  for (i = 0; i < particles.length; i++) {
+    p = particles[i];
+    ctx.globalAlpha = Math.max(0, p.life / 0.55);
+    ctx.fillStyle = COLORS[p.color].main;
+    var ps = p.size * cell;
+    ctx.fillRect(p.x * cell - ps / 2, p.y * cell - ps / 2, ps, ps);
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.textAlign = 'center';
+  for (i = 0; i < floats.length; i++) {
+    f = floats[i];
+    ctx.globalAlpha = Math.min(1, f.life * 1.6);
+    ctx.font = '800 ' + Math.max(14, cell * 0.55) + 'px sans-serif';
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 4;
+    ctx.strokeText(f.text, f.x * cell, f.y * cell);
+    ctx.fillStyle = '#ffe27a';
+    ctx.fillText(f.text, f.x * cell, f.y * cell);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  requestAnimationFrame(frame);
+}
+
+/* ---------- 입력 ---------- */
+/* 낙하 애니메이션 중에도 '눈에 보이는' 블록 기준으로 판정 */
+function blockAtPoint(px, py){
+  for (var c = 0; c < COLS; c++) for (var r = 0; r < ROWS; r++) {
+    var b = grid[c][r];
+    if (b && px >= b.fx && px < b.fx + 1 && py >= b.fy && py < b.fy + 1) return b;
+  }
+  return null;
+}
+function eventCell(e){
+  var rect = canvas.getBoundingClientRect();
+  var px = (e.clientX - rect.left) / cell;
+  var py = (e.clientY - rect.top) / cell;
+  if (px < 0 || px >= COLS || py < 0 || py >= ROWS) return null;
+  var b = blockAtPoint(px, py);
+  return b ? [b.col, b.row] : null;
+}
+canvas.addEventListener('pointerdown', function(e){
+  if (e.button !== 0 || e.isPrimary === false) return; // 좌클릭/첫 손가락만
+  e.preventDefault();
+  ensureAudio();
+  var p = eventCell(e);
+  if (p) tapCell(p[0], p[1]);
+});
+canvas.addEventListener('pointerup', ensureAudio); // iOS 오디오 활성화는 터치 종료 시점에만 인정됨
+canvas.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+if (window.matchMedia && matchMedia('(hover:hover)').matches) {
+  canvas.addEventListener('pointermove', function(e){
+    var p = eventCell(e);
+    hoverSet = null;
+    dirty = true;
+    if (!p || gameOver) return;
+    var g = findGroup(p[0], p[1]);
+    if (g.length >= 2) {
+      hoverSet = {};
+      for (var i = 0; i < g.length; i++) hoverSet[g[i].col * ROWS + g[i].row] = true;
+    }
+  });
+  canvas.addEventListener('pointerleave', function(){ hoverSet = null; dirty = true; });
+}
+
+$('retryBtn').addEventListener('click', function(){ ensureAudio(); newGame(); });
+$('newBtn').addEventListener('click', function(){ ensureAudio(); newGame(); });
+$('soundBtn').addEventListener('click', function(){
+  muted = !muted;
+  save('blockpang_muted', muted ? 1 : 0);
+  this.textContent = muted ? '🔇' : '🔊';
+  if (!muted) { ensureAudio(); beep(660, 0.08, 'triangle', 0.05); }
+});
+if (muted) $('soundBtn').textContent = '🔇';
+
+/* ---------- 크기 조정 ---------- */
+var lastDpr = 0, lastAvailW = 0, lastAvailH = 0;
+function resize(){
+  var wrap = $('boardWrap');
+  var availW = wrap.clientWidth, availH = wrap.clientHeight;
+  var dpr = window.devicePixelRatio || 1;
+  lastDpr = dpr; lastAvailW = availW; lastAvailH = availH;
+  cell = Math.max(6, Math.floor(Math.min(availW / COLS, availH / ROWS)));
+  var W = cell * COLS, H = cell * ROWS;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  dirty = true;
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', function(){ setTimeout(resize, 250); });
+if (window.ResizeObserver) new ResizeObserver(resize).observe($('boardWrap'));
+function checkResize(){
+  var wrap = $('boardWrap');
+  if ((window.devicePixelRatio || 1) !== lastDpr ||
+      wrap.clientWidth !== lastAvailW || wrap.clientHeight !== lastAvailH) resize();
+}
+
+/* ---------- 시작 ---------- */
+best = loadNum('blockpang_best');
+resize();
+newGame();
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
